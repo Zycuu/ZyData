@@ -1,0 +1,19 @@
+{
+  "schemaVersion": 1,
+  "id": "zydata",
+  "version": "${version}",
+  "name": "ZyData",
+  "description": "Server-side datapack item catalog opened with /zydata open.",
+  "authors": ["Zycu"],
+  "license": "MIT",
+  "environment": "server",
+  "entrypoints": {
+    "main": ["com.zycu.zydata.ZyData"]
+  },
+  "depends": {
+    "fabricloader": ">=0.19.3",
+    "minecraft": "=26.1.1",
+    "java": ">=25",
+    "fabric-api": "*"
+  }
+}
