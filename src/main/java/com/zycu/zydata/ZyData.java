@@ -15,11 +15,8 @@ import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.server.packs.resources.Resource;
 import net.minecraft.world.SimpleContainer;
 import net.minecraft.world.SimpleMenuProvider;
-import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.inventory.ChestMenu;
-import net.minecraft.world.inventory.ClickType;
-import net.minecraft.world.inventory.MenuType;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.level.storage.loot.LootParams;
@@ -61,7 +58,7 @@ public final class ZyData implements ModInitializer {
         int pages = Math.max(1, (stacks.size() + CONTENT_SLOTS - 1) / CONTENT_SLOTS);
         int page = Math.max(1, Math.min(requestedPage, pages));
 
-        CatalogContainer container = new CatalogContainer(54);
+        CatalogContainer container = new CatalogContainer(54, player, page, pages);
         int start = (page - 1) * CONTENT_SLOTS;
         int end = Math.min(start + CONTENT_SLOTS, stacks.size());
 
@@ -84,14 +81,7 @@ public final class ZyData implements ModInitializer {
 
         Component title = Component.literal("ZyData " + page + "/" + pages);
         player.openMenu(new SimpleMenuProvider(
-            (containerId, inventory, ignored) -> new CatalogMenu(
-                containerId,
-                inventory,
-                container,
-                player,
-                page,
-                pages
-            ),
+            (containerId, inventory, ignored) -> ChestMenu.sixRows(containerId, inventory, container),
             title
         ));
 
@@ -163,66 +153,73 @@ public final class ZyData implements ModInitializer {
         return stack.getItem().toString() + "|" + stack.getComponents().toString();
     }
 
-    private static final class CatalogMenu extends ChestMenu {
+    private static final class CatalogContainer extends SimpleContainer {
         private final ServerPlayer owner;
         private final int page;
         private final int pages;
+        private boolean changingPage;
 
-        CatalogMenu(
-            int containerId,
-            Inventory inventory,
-            CatalogContainer container,
-            ServerPlayer owner,
-            int page,
-            int pages
-        ) {
-            super(MenuType.GENERIC_9x6, containerId, inventory, container, 6);
+        CatalogContainer(int size, ServerPlayer owner, int page, int pages) {
+            super(size);
             this.owner = owner;
             this.page = page;
             this.pages = pages;
         }
 
-        @Override
-        public void clicked(int slotId, int button, ClickType clickType, Player player) {
-            if (slotId == PREVIOUS_SLOT && page > 1) {
-                owner.closeContainer();
-                open(owner, page - 1);
-                return;
-            }
-
-            if (slotId == NEXT_SLOT && page < pages) {
-                owner.closeContainer();
-                open(owner, page + 1);
-                return;
-            }
-
-            if (slotId == INFO_SLOT) {
-                return;
-            }
-
-            if (slotId >= 0 && slotId < CONTENT_SLOTS) {
-                ItemStack shown = getSlot(slotId).getItem();
-                if (!shown.isEmpty()) {
-                    ItemStack copy = shown.copy();
-                    copy.setCount(Math.max(1, copy.getMaxStackSize()));
-                    if (!owner.getInventory().add(copy)) {
-                        owner.drop(copy, false);
-                    }
-                }
-                return;
-            }
-
-            super.clicked(slotId, button, clickType, player);
-        }
-    }
-
-    private static final class CatalogContainer extends SimpleContainer {
-        CatalogContainer(int size) {
-            super(size);
-        }
-
         void seed(int slot, ItemStack stack) {
             super.setItem(slot, stack.copy());
+        }
+
+        @Override
+        public ItemStack removeItem(int slot, int amount) {
+            if (slot == PREVIOUS_SLOT && page > 1) {
+                changePage(page - 1);
+                return ItemStack.EMPTY;
+            }
+
+            if (slot == NEXT_SLOT && page < pages) {
+                changePage(page + 1);
+                return ItemStack.EMPTY;
+            }
+
+            if (slot == INFO_SLOT) {
+                return ItemStack.EMPTY;
+            }
+
+            if (slot >= 0 && slot < CONTENT_SLOTS) {
+                ItemStack shown = getItem(slot);
+                if (shown.isEmpty()) {
+                    return ItemStack.EMPTY;
+                }
+
+                ItemStack copy = shown.copy();
+                copy.setCount(Math.min(Math.max(1, amount), copy.getMaxStackSize()));
+                return copy;
+            }
+
+            return ItemStack.EMPTY;
+        }
+
+        @Override
+        public ItemStack removeItemNoUpdate(int slot) {
+            return removeItem(slot, getItem(slot).getMaxStackSize());
+        }
+
+        @Override
+        public void setItem(int slot, ItemStack stack) {
+            // Read-only catalog. Client interactions cannot replace catalog contents.
+        }
+
+        private void changePage(int targetPage) {
+            if (changingPage) {
+                return;
+            }
+            changingPage = true;
+            MinecraftServer server = owner.level().getServer();
+            server.execute(() -> {
+                owner.closeContainer();
+                open(owner, targetPage);
+            });
         }
 
         @Override
