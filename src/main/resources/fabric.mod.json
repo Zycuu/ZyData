@@ -6,7 +6,7 @@
   "description": "Server-side datapack item catalog opened with /zydata open.",
   "authors": ["Zycu"],
   "license": "MIT",
-  "environment": "server",
+  "environment": "*",
   "entrypoints": {
     "main": ["com.zycu.zydata.ZyData"]
   },
