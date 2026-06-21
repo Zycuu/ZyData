@@ -7,14 +7,15 @@ import net.minecraft.commands.Commands;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceKey;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.SimpleContainer;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.inventory.ChestMenu;
-import net.minecraft.world.inventory.SimpleMenuProvider;
+import net.minecraft.world.SimpleMenuProvider;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.storage.loot.LootParams;
 import net.minecraft.world.level.storage.loot.LootTable;
@@ -223,7 +224,6 @@ public final class ZyData implements ModInitializer {
     public void onInitialize() {
         CommandRegistrationCallback.EVENT.register((dispatcher, registryAccess, environment) ->
             dispatcher.register(Commands.literal("zydata")
-                .requires(source -> source.hasPermission(2))
                 .then(Commands.literal("open")
                     .executes(context -> open(context.getSource().getPlayerOrException(), 1))
                     .then(Commands.argument("page", IntegerArgumentType.integer(1))
@@ -261,17 +261,17 @@ public final class ZyData implements ModInitializer {
     }
 
     private static List<ItemStack> buildCatalog(ServerPlayer player) {
-        MinecraftServer server = player.getServer();
+        MinecraftServer server = player.level().getServer();
         List<ItemStack> result = new ArrayList<>();
 
-        LootParams params = new LootParams.Builder(player.serverLevel())
+        LootParams params = new LootParams.Builder((ServerLevel) player.level())
             .withParameter(LootContextParams.ORIGIN, player.position())
             .withOptionalParameter(LootContextParams.THIS_ENTITY, player)
             .create(LootContextParamSets.CHEST);
 
         for (String id : LOOT_TABLES) {
             try {
-                ResourceLocation location = ResourceLocation.parse(id);
+                Identifier location = Identifier.parse(id);
                 ResourceKey<LootTable> key = ResourceKey.create(Registries.LOOT_TABLE, location);
                 LootTable table = server.reloadableRegistries().getLootTable(key);
                 List<ItemStack> generated = table.getRandomItems(params);
